@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>noVNC 最小化演示</title>
+  <style>
+    body, html { 
+      margin: 0; 
+      padding: 0; 
+      height: 100%; 
+      overflow: hidden; 
+      background-color: #f0f0f0;
+    }
+    #container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      align-items: center;
+      justify-content: center;
+    }
+    #vnc { 
+      width: 800px; 
+      height: 600px;
+      border: 1px solid #ccc;
+      margin: 20px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      font-family: Arial, sans-serif;
+      color: #333;
+    }
+    #controls {
+      margin: 10px;
+    }
+    button {
+      padding: 8px 15px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 0 5px;
+    }
+    button:hover {
+      background: #45a049;
+    }
+    #status {
+      color: #666;
+      margin: 10px 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <h1>noVNC 最小化演示</h1>
+    <div id="vnc"></div>
+    <div id="status">状态: 未连接</div>
+    <div id="controls">
+      <button id="connectButton">连接</button>
+      <button id="disconnectButton">断开连接</button>
+    </div>
+  </div>
+  
+  <script src="./core/util/logging.js" type="module"></script>
+  <script type="module">
+    // 导入 RFB - 确保路径正确
+    import RFB from './core/rfb.js';
+    
+    let rfb = null;
+    let connected = false;
+    const statusElement = document.getElementById('status');
+    
+    document.getElementById('connectButton').onclick = connectToVNC;
+    document.getElementById('disconnectButton').onclick = disconnectFromVNC;
+    
+    function connectToVNC() {
+      if (connected) return;
+      
+      // 直接使用localhost作为连接地址，避免使用hostname
+      const host = "localhost";
+      const protocol = "ws";
+      const port = "6080";
+      
+      // 去掉/websockify路径
+      const wsUrl = `${protocol}://${host}:${port}`;
+      
+      statusElement.textContent = "状态: 正在连接...";
+      console.log(`正在连接到: ${wsUrl}`);
+      
+      try {
+        // 创建 RFB 对象并连接
+        rfb = new RFB(document.getElementById('vnc'), wsUrl, {
+          credentials: { password: "" } // 如果VNC服务器需要密码，可以在这里提供
+        });
+        
+        // 设置事件处理程序
+        rfb.addEventListener('connect', () => {
+          console.log('已连接到 VNC 服务器');
+          connected = true;
+          statusElement.textContent = "状态: 已连接";
+          document.getElementById('connectButton').disabled = true;
+          document.getElementById('disconnectButton').disabled = false;
+        });
+        
+        rfb.addEventListener('disconnect', (e) => {
+          console.log('已断开 VNC 连接', e);
+          connected = false;
+          statusElement.textContent = `状态: 已断开 (${e.detail.reason})`;
+          document.getElementById('connectButton').disabled = false;
+          document.getElementById('disconnectButton').disabled = true;
+        });
+        
+        rfb.addEventListener('credentialsrequired', () => {
+          const password = prompt("请输入VNC密码:");
+          if (password) {
+            rfb.sendCredentials({ password: password });
+          }
+        });
+      } catch (e) {
+        statusElement.textContent = `状态: 连接失败 (${e.message})`;
+        console.error('连接失败', e);
+      }
+    }
+    
+    function disconnectFromVNC() {
+      if (!connected) return;
+      
+      if (rfb) {
+        rfb.disconnect();
+        rfb = null;
+      }
+    }
+    
+    document.getElementById('disconnectButton').disabled = true;
+  </script>
+</body>
+</html>

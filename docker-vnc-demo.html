@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Docker VNC 演示</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+      background-color: #f0f0f0;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    .header {
+      background-color: #4a76a8;
+      color: white;
+      padding: 10px;
+      text-align: center;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .vnc-container {
+      flex: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+    #vnc {
+      width: 100%;
+      height: 100%;
+      max-width: 1280px;
+      max-height: 720px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      background-color: #fff;
+    }
+    .controls {
+      padding: 10px;
+      text-align: center;
+      background-color: #eee;
+      border-top: 1px solid #ddd;
+    }
+    button {
+      padding: 8px 15px;
+      margin: 0 5px;
+      background-color: #4a76a8;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    button:hover {
+      background-color: #3b5998;
+    }
+    .status {
+      margin: 10px 0;
+      font-size: 14px;
+      color: #666;
+    }
+    .info {
+      background-color: #e7f3fe;
+      border-left: 4px solid #2196F3;
+      padding: 10px;
+      margin: 10px 0;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Docker VNC 演示</h1>
+    </div>
+    
+    <div class="info">
+      这是一个运行在Docker容器中的VNC服务演示。默认密码: <strong>vncpassword</strong>
+    </div>
+    
+    <div class="vnc-container">
+      <div id="vnc"></div>
+    </div>
+    
+    <div class="status" id="status">状态: 未连接</div>
+    
+    <div class="controls">
+      <button id="connectButton">连接</button>
+      <button id="disconnectButton" disabled>断开连接</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import RFB from './core/rfb.js';
+    
+    let rfb;
+    let connected = false;
+    const statusElement = document.getElementById('status');
+    const connectButton = document.getElementById('connectButton');
+    const disconnectButton = document.getElementById('disconnectButton');
+    
+    connectButton.onclick = connectToVNC;
+    disconnectButton.onclick = disconnectFromVNC;
+    
+    function connectToVNC() {
+      if (connected) return;
+      
+      const host = window.location.hostname;
+      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      const port = window.location.port || '6080';
+      
+      const wsUrl = `${protocol}://${host}:${port}`;
+      
+      statusElement.textContent = "状态: 正在连接...";
+      console.log(`正在连接到: ${wsUrl}`);
+      
+      try {
+        rfb = new RFB(document.getElementById('vnc'), wsUrl, {
+          credentials: { password: "vncpassword" }
+        });
+        
+        rfb.addEventListener('connect', () => {
+          console.log('已连接到 Docker VNC 服务器');
+          connected = true;
+          statusElement.textContent = "状态: 已连接";
+          connectButton.disabled = true;
+          disconnectButton.disabled = false;
+        });
+        
+        rfb.addEventListener('disconnect', (e) => {
+          console.log('已断开 VNC 连接', e);
+          connected = false;
+          statusElement.textContent = `状态: 已断开 (${e.detail?.reason || '未知原因'})`;
+          connectButton.disabled = false;
+          disconnectButton.disabled = true;
+        });
+        
+        rfb.addEventListener('credentialsrequired', () => {
+          const password = prompt("请输入VNC密码 (默认: vncpassword):", "vncpassword");
+          if (password) {
+            rfb.sendCredentials({ password: password });
+          }
+        });
+      } catch (e) {
+        statusElement.textContent = `状态: 连接失败 (${e.message})`;
+        console.error('连接失败', e);
+      }
+    }
+    
+    function disconnectFromVNC() {
+      if (!connected) return;
+      
+      if (rfb) {
+        rfb.disconnect();
+        rfb = null;
+      }
+    }
+  </script>
+</body>
+</html> 

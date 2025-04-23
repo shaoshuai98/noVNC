@@ -1,0 +1,12 @@
+version: '3'
+
+services:
+  vnc-server:
+    image: consol/ubuntu-xfce-vnc
+    environment:
+      - VNC_PW=vncpassword
+      - VNC_RESOLUTION=1280x720
+    ports:
+      - "5901:5901"  # VNC端口
+      - "6901:6901"  # noVNC端口
+    restart: unless-stopped 
